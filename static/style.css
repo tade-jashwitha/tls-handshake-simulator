@@ -1,0 +1,17 @@
+.connection{
+width:300px;
+height:4px;
+background:#d0d7e2;
+position:relative;
+}
+
+#packet{
+width:30px;
+height:30px;
+background:#3498db;
+border-radius:50%;
+position:absolute;
+top:-13px;
+left:0;
+transition:left 1s ease;
+}

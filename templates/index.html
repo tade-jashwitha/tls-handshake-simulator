@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>TLS Handshake Simulator</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<h1>🔐 TLS Handshake Simulator</h1>
+
+<div class="network">
+
+<div class="node client">
+<h2>Client</h2>
+<p>Browser</p>
+</div>
+
+<div class="connection">
+<div id="packet"></div>
+</div>
+
+<div class="node server">
+<h2>Server</h2>
+<p>Secure Website</p>
+</div>
+
+</div>
+
+<button onclick="startSimulation()">Start Handshake</button>
+
+<div class="timeline">
+
+<h3>TLS Handshake Progress</h3>
+
+<ul id="steps"></ul>
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
