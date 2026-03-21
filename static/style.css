@@ -1,17 +1,182 @@
-.connection{
-width:300px;
-height:4px;
-background:#d0d7e2;
-position:relative;
+body {
+  font-family: "Poppins", sans-serif;
+  background: #0f172a;
+  color: #fff;
+  text-align: center;
 }
 
-#packet{
-width:30px;
-height:30px;
-background:#3498db;
-border-radius:50%;
-position:absolute;
-top:-13px;
-left:0;
-transition:left 1s ease;
+.title {
+  margin-top: 20px;
+}
+
+/* ================= NETWORK ================= */
+
+.network {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 40px 0;
+}
+
+.node {
+  padding: 20px;
+  border-radius: 10px;
+  width: 150px;
+  background: #1e293b;
+  transition:
+    transform 0.3s,
+    box-shadow 0.3s;
+}
+
+.node.active {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px #00ffcc;
+}
+
+/* ================= CONNECTION ================= */
+
+.connection {
+  width: 350px;
+  height: 6px;
+  background: linear-gradient(to right, #2c3e50, #4ca1af);
+  position: relative;
+  margin: 0 20px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(76, 161, 175, 0.5);
+}
+
+/* Flow animation */
+.connection::before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    to right,
+    transparent,
+    transparent 12px,
+    rgba(255, 255, 255, 0.2) 12px,
+    rgba(255, 255, 255, 0.2) 24px
+  );
+  animation: flow 1s linear infinite;
+}
+
+@keyframes flow {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(24px);
+  }
+}
+
+/* ================= PACKET ================= */
+
+#packet {
+  width: 28px;
+  height: 28px;
+  background: radial-gradient(circle, #00ffcc, #3498db);
+  border-radius: 50%;
+  position: absolute;
+  top: -11px;
+  left: 0;
+  transition: left 1s ease-in-out;
+  box-shadow:
+    0 0 10px #00ffcc,
+    0 0 20px #3498db;
+}
+
+#packet.active {
+  box-shadow:
+    0 0 20px #00ffcc,
+    0 0 40px #3498db;
+}
+
+/* ================= CONTROLS ================= */
+
+.controls button {
+  padding: 10px 20px;
+  margin: 10px;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.controls button:hover {
+  background: #2563eb;
+}
+
+/* ================= TIMELINE ================= */
+
+.timeline {
+  margin-top: 30px;
+}
+
+.timeline ul {
+  list-style: none;
+  padding: 0;
+}
+
+.timeline li {
+  padding: 12px;
+  margin: 6px 0;
+  background: #1e293b;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+/* ACTIVE (only current step glows) */
+.timeline li.active {
+  background: #2563eb;
+  box-shadow: 0 0 12px #3b82f6;
+  position: relative;
+}
+
+/* Arrow indicator */
+.timeline li.active::before {
+  content: "➤";
+  position: absolute;
+  left: -25px;
+  color: #3b82f6;
+  font-size: 18px;
+}
+
+/* DONE (force no glow) */
+.timeline li.done {
+  background: rgba(12, 213, 85, 0.6);
+  box-shadow: none !important;
+}
+
+/* Remove arrow after done */
+.timeline li.done::before {
+  content: "";
+}
+
+/* Optional checkmark */
+.timeline li.done::after {
+  content: "✔";
+  float: right;
+}
+
+/* Hover effect */
+.timeline li:hover {
+  cursor: pointer;
+  transform: scale(1.03);
+}
+
+/* ================= INFO PANEL ================= */
+
+.info-panel {
+  margin-top: 30px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: #1e293b;
+  border-radius: 10px;
+  width: 60%;
+  margin-left: auto;
+  margin-right: auto;
 }

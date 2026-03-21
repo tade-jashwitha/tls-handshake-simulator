@@ -1,46 +1,53 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
+  <head>
+    <title>TLS Handshake Simulator</title>
 
-<title>TLS Handshake Simulator</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
 
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
 
-</head>
+  <body>
+    <h1 class="title">🔐 TLS Handshake Simulator</h1>
 
-<body>
+    <div class="network">
+      <div class="node client">
+        <h2>Client</h2>
+        <p>🌐 Browser</p>
+      </div>
 
-<h1>🔐 TLS Handshake Simulator</h1>
+      <div class="connection">
+        <div id="packet"></div>
+      </div>
 
-<div class="network">
+      <div class="node server">
+        <h2>Server</h2>
+        <p>🔒 Secure Website</p>
+      </div>
+    </div>
 
-<div class="node client">
-<h2>Client</h2>
-<p>Browser</p>
-</div>
+    <div class="controls">
+      <button onclick="startSimulation()">▶ Start</button>
+      <button onclick="resetSimulation()">🔄 Reset</button>
+    </div>
 
-<div class="connection">
-<div id="packet"></div>
-</div>
+    <div class="info-panel">
+      <h3>🧠 Step Explanation</h3>
+      <p id="info">Click "Start" to begin the TLS handshake simulation.</p>
+    </div>
 
-<div class="node server">
-<h2>Server</h2>
-<p>Secure Website</p>
-</div>
+    <div class="timeline">
+      <h3>📡 TLS Handshake Progress</h3>
+      <ul id="steps"></ul>
+    </div>
 
-</div>
-
-<button onclick="startSimulation()">Start Handshake</button>
-
-<div class="timeline">
-
-<h3>TLS Handshake Progress</h3>
-
-<ul id="steps"></ul>
-
-</div>
-
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-
-</body>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+  </body>
 </html>
