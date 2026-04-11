@@ -1,42 +1,181 @@
-import random
-from encryption import encrypt_message, generate_session_key, get_cipher_suites
+#  TLS Handshake Simulation
+
+##  Project Overview
+
+This project is a **simulation of the SSL/TLS Handshake Protocol**, demonstrating how a secure connection is established between a client (browser) and a server.
+
+The simulation visually represents the **step-by-step TLS handshake process**, including message exchange, certificate verification, and session key generation.
 
 
-class Client:
 
-    def __init__(self):
-        self.client_random = format(random.randint(0, 2**32 - 1), "08x").upper()
-        self.tls_version = "TLS 1.3"
-        self.supported_ciphers = get_cipher_suites()
-        self.session_id = None
+##  Objectives
 
-    def client_hello(self):
-        return {
-            "random": self.client_random,
-            "tls_version": self.tls_version,
-            "cipher_suites": self.supported_ciphers,
-            "extensions": ["server_name", "supported_groups", "signature_algorithms"],
-        }
+* Understand how secure communication works over the internet
+* Learn the TLS handshake process
+* Simulate client-server authentication
+* Demonstrate secure key exchange
+* Visualize session key generation
 
-    def verify_certificate(self, certificate):
-        trusted_issuers = ["DigiCert", "Let's Encrypt", "GlobalSign", "Comodo"]
-        if certificate.issuer in trusted_issuers and certificate.is_valid():
-            return True, f"Certificate verified — issued by {certificate.issuer}"
-        elif certificate.issuer not in trusted_issuers:
-            return False, f"Untrusted issuer: {certificate.issuer}"
-        else:
-            return False, "Certificate has expired"
 
-    def generate_pre_master_secret(self):
-        return format(random.randint(0, 2**32 - 1), "08x").upper() + \
-               format(random.randint(0, 2**32 - 1), "08x").upper()
 
-    def encrypt_pre_master(self, public_key, pre_master):
-        return encrypt_message(public_key, pre_master)
+## Key Concepts Covered
 
-    def generate_session_key(self, server_random, pre_master):
-        return generate_session_key(
-            self.client_random,
-            server_random,
-            pre_master
-        )
+* SSL vs TLS
+* Client-Server Architecture
+* Public Key Cryptography (RSA)
+* Symmetric Encryption
+* Digital Certificates
+* Hash Functions (SHA-256)
+* Session Key Generation
+
+
+
+## TLS Handshake Process (Simulated)
+
+1. **Client Hello**
+   Client sends supported cipher suites and a random number
+
+2. **Server Hello**
+   Server responds with selected cipher suite and its random number
+
+3. **Certificate Exchange**
+   Server sends its digital certificate
+
+4. **Certificate Verification**
+   Client verifies the authenticity of the certificate
+
+5. **Pre-Master Secret Exchange**
+   Client generates a secret and encrypts it using server’s public key
+
+6. **Session Key Generation**
+   Both client and server compute the same session key
+
+7. **Secure Communication**
+   Encrypted communication begins
+
+
+
+## Project Structure
+
+```
+tls_handshake_simulation
+│
+├── app.py                  # Flask backend
+├── client.py               # Client simulation
+├── server.py               # Server simulation
+├── encryption.py           # Cryptographic functions
+├── certificate.py          # Certificate handling
+│
+├── templates/
+│   └── index.html          # Frontend UI
+│
+└── static/
+    ├── style.css           # Styling
+    └── script.js           # Frontend logic
+```
+
+
+
+## Technologies Used
+
+* **Python** (Flask)
+* **HTML, CSS, JavaScript**
+* **Cryptography Library**
+* **Hashlib (SHA-256)**
+
+
+
+## How to Run the Project
+
+### Clone the Repository
+
+```
+git clone https://github.com/your-username/tls-handshake-simulation.git
+cd tls-handshake-simulation
+```
+
+### Create Virtual Environment (optional but recommended)
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+### Install Dependencies
+
+```
+pip install flask cryptography
+```
+
+### Run the Application
+
+```
+python app.py
+```
+
+### Open in Browser
+
+```
+http://127.0.0.1:5000
+```
+
+
+
+## How It Works
+
+1. Click **Start Handshake**
+2. Frontend sends request to Flask backend (`/simulate`)
+3. Backend simulates TLS handshake
+4. Steps are returned as JSON
+5. Frontend displays:
+
+   * Packet movement between client & server
+   * Step-by-step handshake progress
+
+
+
+## Features
+
+* Client-Server Communication Simulation
+* Step-by-step TLS Handshake Visualization
+* Packet Movement Animation
+* Handshake Timeline Display
+* Secure Session Indication
+
+
+
+## Output
+
+The simulation shows:
+
+* Client → Server communication
+* Certificate verification
+* Secure key exchange
+* Session key generation
+* Secure TLS session establishment
+
+
+
+## Applications
+
+* Secure Web Browsing (HTTPS)
+* Online Banking
+* Secure Email Communication
+* VPN Connections
+* Cloud Security
+
+
+
+## Future Enhancements
+
+* Add real-time encryption/decryption visualization
+* Support multiple cipher suites
+* Add graphical animations (arrows, locks)
+* Implement real socket-based communication
+* Add user interaction controls
+
+
+
+## 📄 License
+
+This project is for educational purposes only.
