@@ -1,46 +1,793 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TLS Handshake Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050810;
+    --surface: #0b0f1e;
+    --card: #0f1526;
+    --border: #1e2640;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --green: #00ffa3;
+    --red: #ff4466;
+    --yellow: #ffd60a;
+    --text: #e2e8f0;
+    --muted: #4a5568;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
 
-<title>TLS Handshake Simulator</title>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
 
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Glow orbs ── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.15;
+  }
+  .orb1 { width: 500px; height: 500px; background: var(--accent2); top: -100px; left: -100px; }
+  .orb2 { width: 400px; height: 400px; background: var(--accent); bottom: -100px; right: -100px; }
+
+  /* ── Layout ── */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 100px;
+    padding: 6px 16px;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #fff 30%, var(--accent) 70%, var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 48px;
+    flex-wrap: wrap;
+  }
+
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 16px;
+  }
+
+  .control-group label {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  select {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+
+  select option { background: var(--card); }
+
+  .btn-run {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 28px;
+    background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s;
+    letter-spacing: 0.02em;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-run::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .btn-run:hover::after { opacity: 1; }
+  .btn-run:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,212,255,0.3); }
+  .btn-run:active { transform: translateY(0); }
+  .btn-run:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-icon { font-size: 18px; }
+
+  /* ── Timeline layout: two columns + center line ── */
+  .timeline {
+    position: relative;
+    padding: 0 0 40px;
+  }
+
+  /* ── Two entity labels ── */
+  .entities {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    gap: 0;
+    margin-bottom: 32px;
+    align-items: center;
+  }
+
+  .entity {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 20px;
+  }
+
+  .entity.right { flex-direction: row-reverse; }
+
+  .entity-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .entity.left .entity-icon { background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2); }
+  .entity.right .entity-icon { background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3); }
+
+  .entity-name {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .entity-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .center-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Steps ── */
+  .steps-area { display: flex; flex-direction: column; gap: 0; }
+
+  .step-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 1fr;
+    align-items: flex-start;
+    gap: 0;
+    position: relative;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .step-row.visible { opacity: 1; transform: translateY(0); }
+
+  /* center connector */
+  .step-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    padding: 0;
+  }
+
+  .step-connector .vline {
+    width: 2px;
+    background: linear-gradient(var(--border), var(--border));
+    flex: 1;
+    min-height: 100%;
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .step-num {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    position: relative;
+    z-index: 2;
+    flex-shrink: 0;
+    margin: 20px 0;
+    border: 2px solid var(--border);
+    background: var(--bg);
+    color: var(--muted);
+    transition: all 0.4s;
+  }
+
+  .step-num.success {
+    border-color: var(--green);
+    color: var(--green);
+    box-shadow: 0 0 12px rgba(0,255,163,0.3);
+    background: rgba(0,255,163,0.05);
+  }
+
+  .step-num.error {
+    border-color: var(--red);
+    color: var(--red);
+    box-shadow: 0 0 12px rgba(255,68,102,0.3);
+    background: rgba(255,68,102,0.05);
+  }
+
+  .step-num.pending {
+    border-color: var(--muted);
+    color: var(--muted);
+  }
+
+  /* ── Card ── */
+  .step-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin: 12px 0;
+    transition: border-color 0.3s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .step-card::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+    background: var(--muted);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  .step-card.success::before { background: var(--green); box-shadow: 0 0 8px rgba(0,255,163,0.4); }
+  .step-card.error::before { background: var(--red); box-shadow: 0 0 8px rgba(255,68,102,0.4); }
+  .step-card.success { border-color: rgba(0,255,163,0.15); }
+  .step-card.error { border-color: rgba(255,68,102,0.15); }
+  .step-card:hover { border-color: rgba(0,212,255,0.3); }
+
+  /* right side cards */
+  .step-cell.right .step-card::before { left: auto; right: 0; border-radius: 0 3px 3px 0; }
+
+  /* empty cell (opposite side) */
+  .step-cell.empty { visibility: hidden; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+
+  .card-title {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    flex: 1;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--muted);
+  }
+  .success .status-dot { background: var(--green); box-shadow: 0 0 6px rgba(0,255,163,0.6); }
+  .error .status-dot { background: var(--red); box-shadow: 0 0 6px rgba(255,68,102,0.6); }
+
+  .card-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  /* Arrow badge */
+  .arrow-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--accent);
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 100px;
+    padding: 3px 10px;
+    margin-bottom: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .arrow-badge.server { color: var(--accent2); background: rgba(124,58,237,0.08); border-color: rgba(124,58,237,0.2); }
+  .arrow-badge.internal { color: var(--yellow); background: rgba(255,214,10,0.08); border-color: rgba(255,214,10,0.2); }
+
+  /* ── Packet table (collapsible) ── */
+  .packet-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: var(--mono);
+  }
+
+  .packet-toggle:hover { color: var(--accent); }
+
+  .packet-toggle .chevron {
+    transition: transform 0.3s;
+    font-style: normal;
+  }
+
+  .packet-toggle.open .chevron { transform: rotate(90deg); }
+
+  .packet-body {
+    display: none;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .packet-body.open { display: block; }
+
+  .packet-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .packet-row:last-child { border-bottom: none; }
+
+  .pk-key {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--muted);
+    background: rgba(255,255,255,0.02);
+    border-right: 1px solid var(--border);
+    letter-spacing: 0.03em;
+  }
+
+  .pk-val {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.5;
+  }
+
+  /* ── Arrow animation between cards ── */
+  .arrow-line {
+    position: absolute;
+    top: 50%; left: 0; right: 0;
+    height: 2px;
+    pointer-events: none;
+  }
+
+  /* ── Result banner ── */
+  .result-banner {
+    display: none;
+    margin-top: 32px;
+    border-radius: 16px;
+    padding: 24px 28px;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .result-banner.show { display: flex; }
+  .result-banner.success { background: rgba(0,255,163,0.06); border: 1px solid rgba(0,255,163,0.2); }
+  .result-banner.error { background: rgba(255,68,102,0.06); border: 1px solid rgba(255,68,102,0.2); }
+
+  .result-icon { font-size: 32px; }
+
+  .result-text h3 {
+    font-family: var(--sans);
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .result-text p { font-size: 13px; color: var(--muted); }
+
+  .result-text { flex: 1; }
+
+  .btn-cert {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 22px;
+    background: linear-gradient(135deg, #00c9a7, #00d4ff);
+    border: none; border-radius: 12px;
+    color: #000; font-family: var(--sans); font-size: 14px; font-weight: 800;
+    cursor: pointer; transition: all 0.25s; letter-spacing: 0.02em;
+    text-decoration: none; white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0,212,255,0.2);
+    flex-shrink: 0;
+  }
+  .btn-cert:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,212,255,0.35); }
+  .btn-cert:active { transform: translateY(0); }
+
+  /* ── Loader ── */
+  .loader {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 60px 0;
+  }
+
+  .loader.show { display: flex; }
+
+  .spinner {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loader-text {
+    font-size: 13px;
+    color: var(--muted);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* ── Progress bar ── */
+  .progress-wrap {
+    height: 2px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 32px;
+    overflow: hidden;
+    display: none;
+  }
+  .progress-wrap.show { display: block; }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent2), var(--accent));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .entities, .step-row { grid-template-columns: 1fr 48px 1fr; }
+    .entity-sub { display: none; }
+    .entity-name { font-size: 12px; }
+  }
+</style>
 </head>
-
 <body>
 
-<h1>🔐 TLS Handshake Simulator</h1>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
 
-<div class="network">
+<div class="container">
 
-<div class="node client">
-<h2>Client</h2>
-<p>Browser</p>
+  <!-- Header -->
+  <header>
+    <div class="badge">Protocol Visualizer</div>
+    <h1>TLS Handshake</h1>
+    <p class="subtitle">Step-by-step cryptographic negotiation explorer</p>
+  </header>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="control-group">
+      <label>Certificate Authority</label>
+      <select id="issuerSelect">
+        <option value="DigiCert">DigiCert</option>
+        <option value="Let's Encrypt">Let's Encrypt</option>
+        <option value="GlobalSign">GlobalSign</option>
+        <option value="Comodo">Comodo</option>
+        <option value="UnknownCA">Unknown CA (force error)</option>
+      </select>
+    </div>
+    <button class="btn-run" id="runBtn" onclick="runSimulation()">
+      <span class="btn-icon">⚡</span> Run Simulation
+    </button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+
+  <!-- Loader -->
+  <div class="loader" id="loader">
+    <div class="spinner"></div>
+    <div class="loader-text">Initiating handshake...</div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="timeline" id="timeline" style="display:none">
+
+    <!-- Entity labels -->
+    <div class="entities">
+      <div class="entity left">
+        <div class="entity-icon">💻</div>
+        <div>
+          <div class="entity-name">Client</div>
+          <div class="entity-sub">Browser / User Agent</div>
+        </div>
+      </div>
+      <div class="center-line"></div>
+      <div class="entity right">
+        <div class="entity-icon">🖥️</div>
+        <div style="text-align:right">
+          <div class="entity-name">Server</div>
+          <div class="entity-sub">example.com</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Steps injected here -->
+    <div class="steps-area" id="stepsArea"></div>
+
+    <!-- Result -->
+    <div class="result-banner" id="resultBanner">
+      <div class="result-icon" id="resultIcon"></div>
+      <div class="result-text">
+        <h3 id="resultTitle"></h3>
+        <p id="resultSub"></p>
+      </div>
+      <a id="certLink" href="/certificate" class="btn-cert" style="display:none" target="_blank">
+        🔐 View Certificate
+      </a>
+    </div>
+
+  </div><!-- /timeline -->
 </div>
 
-<div class="connection">
-<div id="packet"></div>
-</div>
+<script>
+async function runSimulation() {
+  const issuer = document.getElementById('issuerSelect').value;
+  const btn = document.getElementById('runBtn');
+  const loader = document.getElementById('loader');
+  const timeline = document.getElementById('timeline');
+  const stepsArea = document.getElementById('stepsArea');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressBar = document.getElementById('progressBar');
+  const resultBanner = document.getElementById('resultBanner');
 
-<div class="node server">
-<h2>Server</h2>
-<p>Secure Website</p>
-</div>
+  // Reset
+  btn.disabled = true;
+  stepsArea.innerHTML = '';
+  resultBanner.className = 'result-banner';
+  timeline.style.display = 'none';
+  loader.classList.add('show');
+  progressWrap.classList.add('show');
+  progressBar.style.width = '0%';
 
-</div>
+  try {
+    const res = await fetch(`/simulate?issuer=${encodeURIComponent(issuer)}`);
+    const data = await res.json();
 
-<button onclick="startSimulation()">Start Handshake</button>
+    loader.classList.remove('show');
+    timeline.style.display = 'block';
 
-<div class="timeline">
+    const total = data.steps.length;
 
-<h3>TLS Handshake Progress</h3>
+    for (let i = 0; i < data.steps.length; i++) {
+      const step = data.steps[i];
+      await sleep(280);
+      renderStep(step, stepsArea);
+      // Animate in
+      await sleep(30);
+      const rows = stepsArea.querySelectorAll('.step-row');
+      rows[rows.length - 1].classList.add('visible');
+      // Progress
+      progressBar.style.width = `${((i + 1) / total) * 100}%`;
+    }
 
-<ul id="steps"></ul>
+    await sleep(300);
 
-</div>
+    // Result banner
+    resultBanner.classList.add('show', data.success ? 'success' : 'error');
+    document.getElementById('resultIcon').textContent = data.success ? '🔒' : '🚫';
+    document.getElementById('resultTitle').textContent = data.success
+      ? 'Secure Connection Established'
+      : 'Handshake Failed — Connection Rejected';
+    document.getElementById('resultSub').textContent = data.success
+      ? 'All 8 steps completed. Encrypted channel is live and ready.'
+      : 'The handshake was aborted due to a certificate or key mismatch.';
 
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+    // Show cert button only on success
+    const certLink = document.getElementById('certLink');
+    if (data.success) {
+      certLink.href = `/certificate?issuer=${encodeURIComponent(issuer)}&domain=example.com`;
+      certLink.style.display = 'flex';
+    } else {
+      certLink.style.display = 'none';
+    }
 
+  } catch (err) {
+    loader.classList.remove('show');
+    alert('Simulation failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function directionInfo(dir) {
+  const map = {
+    client_to_server: { side: 'left', badge: '→ Client → Server', cls: '' },
+    server_to_client: { side: 'right', badge: '← Server → Client', cls: 'server' },
+    client_internal:  { side: 'left', badge: '⚙ Client Internal', cls: 'internal' },
+    server_internal:  { side: 'right', badge: '⚙ Server Internal', cls: 'internal' },
+    both_internal:    { side: 'left', badge: '⚙ Both Sides', cls: 'internal' },
+    both:             { side: 'left', badge: '✓ Both Sides', cls: '' },
+  };
+  return map[dir] || { side: 'left', badge: dir, cls: '' };
+}
+
+function renderStep(step, container) {
+  const info = directionInfo(step.direction);
+  const isLeft = info.side === 'left';
+  const statusCls = step.status; // 'success' | 'error'
+
+  const packetRows = Object.entries(step.packet || {}).map(([k, v]) => `
+    <div class="packet-row">
+      <div class="pk-key">${escHtml(k)}</div>
+      <div class="pk-val">${escHtml(String(v))}</div>
+    </div>
+  `).join('');
+
+  const toggleId = `toggle-${step.id}`;
+  const bodyId = `body-${step.id}`;
+
+  const card = `
+    <div class="step-card ${statusCls}">
+      <div class="card-header">
+        <div class="status-dot"></div>
+        <div class="card-title">${escHtml(step.title)}</div>
+      </div>
+      <div class="arrow-badge ${info.cls}">${info.badge}</div>
+      <div class="card-desc">${escHtml(step.description)}</div>
+      ${packetRows ? `
+        <button class="packet-toggle" id="${toggleId}" onclick="togglePacket('${toggleId}','${bodyId}')">
+          <span class="chevron">▶</span> Packet Data
+        </button>
+        <div class="packet-body" id="${bodyId}">${packetRows}</div>
+      ` : ''}
+    </div>
+  `;
+
+  const row = document.createElement('div');
+  row.className = 'step-row';
+
+  row.innerHTML = `
+    <div class="step-cell ${isLeft ? '' : 'empty'}">${isLeft ? card : ''}</div>
+    <div class="step-connector">
+      <div class="vline"></div>
+      <div class="step-num ${statusCls}">${step.id}</div>
+    </div>
+    <div class="step-cell right ${isLeft ? 'empty' : ''}">${isLeft ? '' : card}</div>
+  `;
+
+  container.appendChild(row);
+}
+
+function togglePacket(toggleId, bodyId) {
+  const toggle = document.getElementById(toggleId);
+  const body = document.getElementById(bodyId);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open');
+  toggle.classList.toggle('open');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
 </body>
 </html>

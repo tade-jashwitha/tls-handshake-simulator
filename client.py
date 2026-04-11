@@ -1,42 +1,40 @@
 import random
-from encryption import encrypt_message, generate_session_key
+from encryption import encrypt_message, generate_session_key, get_cipher_suites
 
 
 class Client:
 
     def __init__(self):
-        self.client_random = str(random.randint(100000, 999999))
-
+        self.client_random = format(random.randint(0, 2**32 - 1), "08x").upper()
+        self.tls_version = "TLS 1.3"
+        self.supported_ciphers = get_cipher_suites()
+        self.session_id = None
 
     def client_hello(self):
-        print("Client: Sending Client Hello")
-        return self.client_random
-
+        return {
+            "random": self.client_random,
+            "tls_version": self.tls_version,
+            "cipher_suites": self.supported_ciphers,
+            "extensions": ["server_name", "supported_groups", "signature_algorithms"],
+        }
 
     def verify_certificate(self, certificate):
-        print("Client: Verifying Certificate")
-
-        if certificate.issuer == "DigiCert":
-            print("Client: Certificate Verified")
-            return True
+        trusted_issuers = ["DigiCert", "Let's Encrypt", "GlobalSign", "Comodo"]
+        if certificate.issuer in trusted_issuers and certificate.is_valid():
+            return True, f"Certificate verified — issued by {certificate.issuer}"
+        elif certificate.issuer not in trusted_issuers:
+            return False, f"Untrusted issuer: {certificate.issuer}"
         else:
-            print("Client: Certificate Invalid")
-            return False
-
+            return False, "Certificate has expired"
 
     def generate_pre_master_secret(self):
-        print("Client: Generating Pre-Master Secret")
-        return str(random.randint(1000000, 9999999))
-
+        return format(random.randint(0, 2**32 - 1), "08x").upper() + \
+               format(random.randint(0, 2**32 - 1), "08x").upper()
 
     def encrypt_pre_master(self, public_key, pre_master):
-        print("Client: Encrypting Pre-Master Secret")
         return encrypt_message(public_key, pre_master)
 
-
     def generate_session_key(self, server_random, pre_master):
-        print("Client: Generating Session Key")
-
         return generate_session_key(
             self.client_random,
             server_random,

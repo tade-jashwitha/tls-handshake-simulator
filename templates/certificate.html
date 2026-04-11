@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X.509 Certificate Viewer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050810;
+  --surface: #0b0f1e;
+  --card: #0f1526;
+  --card2: #111827;
+  --border: #1e2640;
+  --border2: #252f4a;
+  --accent: #00d4ff;
+  --accent2: #7c3aed;
+  --green: #00ffa3;
+  --red: #ff4466;
+  --yellow: #ffd60a;
+  --orange: #ff8c42;
+  --text: #e2e8f0;
+  --muted: #4a5568;
+  --muted2: #718096;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Syne', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none; z-index: 0;
+}
+
+.orb { position: fixed; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; }
+.orb1 { width: 500px; height: 500px; background: rgba(124,58,237,0.12); top: -150px; left: -150px; }
+.orb2 { width: 350px; height: 350px; background: rgba(0,212,255,0.08); bottom: -100px; right: -100px; }
+
+/* ── Nav ── */
+nav {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 40px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(5,8,16,0.8);
+  backdrop-filter: blur(12px);
+}
+
+.nav-back {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--muted2); font-size: 13px;
+  text-decoration: none; transition: color 0.2s;
+}
+.nav-back:hover { color: var(--accent); }
+
+.nav-sep { color: var(--border2); }
+
+.nav-title {
+  font-family: var(--sans); font-size: 15px; font-weight: 700;
+  background: linear-gradient(90deg, #fff, var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+/* ── Layout ── */
+.page {
+  position: relative; z-index: 1;
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+/* ── Generator panel ── */
+.gen-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px 32px;
+  margin-bottom: 36px;
+}
+
+.gen-panel h2 {
+  font-family: var(--sans); font-size: 20px; font-weight: 800;
+  margin-bottom: 6px;
+  background: linear-gradient(90deg, #fff 40%, var(--accent));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+.gen-panel p { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+
+.gen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+.field input, .field select {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+.field select option { background: var(--card2); }
+
+.gen-actions { display: flex; gap: 12px; align-items: center; }
+
+.btn-gen {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 28px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  border: none; border-radius: 12px;
+  color: #fff; font-family: var(--sans); font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; letter-spacing: 0.02em;
+}
+.btn-gen:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,212,255,0.25); }
+.btn-gen:active { transform: translateY(0); }
+.btn-gen:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.btn-dl {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 20px;
+  background: transparent;
+  border: 1px solid var(--border2); border-radius: 12px;
+  color: var(--muted2); font-family: var(--mono); font-size: 13px;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-dl:hover { border-color: var(--accent); color: var(--accent); }
+.btn-dl:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Certificate viewer ── */
+#certView { display: none; }
+#certView.show { display: block; }
+
+/* ── Certificate Card (the visual cert) ── */
+.cert-card {
+  background: linear-gradient(145deg, #0d1629 0%, #111f3a 50%, #0d1629 100%);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 24px;
+  padding: 0;
+  margin-bottom: 32px;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgba(0,212,255,0.08), 0 40px 80px rgba(0,0,0,0.5);
+  position: relative;
+}
+
+/* Decorative top bar */
+.cert-topbar {
+  background: linear-gradient(90deg, var(--accent2), #4f46e5, var(--accent));
+  height: 4px;
+}
+
+/* Watermark */
+.cert-watermark {
+  position: absolute;
+  right: -20px; top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--sans);
+  font-size: 140px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.015);
+  letter-spacing: -0.05em;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cert-inner { padding: 32px 40px 36px; }
+
+/* Header row */
+.cert-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  gap: 20px;
+}
+
+.cert-issuer-block { display: flex; align-items: center; gap: 14px; }
+
+.issuer-logo {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, var(--accent2), var(--accent));
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  box-shadow: 0 4px 20px rgba(0,212,255,0.3);
+  flex-shrink: 0;
+}
+
+.issuer-name {
+  font-family: var(--sans); font-size: 22px; font-weight: 800;
+  color: #fff; line-height: 1.1;
+}
+.issuer-sub { font-size: 11px; color: var(--muted2); margin-top: 3px; letter-spacing: 0.05em; }
+
+.cert-valid-badge {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(0,255,163,0.08);
+  border: 1px solid rgba(0,255,163,0.25);
+  border-radius: 100px;
+  padding: 8px 18px;
+  font-size: 12px; color: var(--green); font-weight: 600;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+.cert-valid-badge.invalid { background: rgba(255,68,102,0.08); border-color: rgba(255,68,102,0.25); color: var(--red); }
+.cert-valid-badge::before {
+  content: '';
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: blink 2s ease-in-out infinite;
+}
+.cert-valid-badge.invalid::before { background: var(--red); box-shadow: 0 0 8px var(--red); animation: none; }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Big domain */
+.cert-domain {
+  font-family: var(--sans);
+  font-size: clamp(22px, 4vw, 38px);
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
+.cert-org {
+  font-size: 13px; color: var(--muted2); margin-bottom: 24px;
+}
+
+/* Divider */
+.cert-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2) 20%, var(--border2) 80%, transparent);
+  margin: 20px 0;
+}
+
+/* Info grid */
+.cert-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.cert-field { }
+.cf-label {
+  font-size: 10px; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.1em; margin-bottom: 5px;
+}
+.cf-value {
+  font-size: 13px; color: var(--text); line-height: 1.4;
+  word-break: break-all;
+}
+.cf-value.mono { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+.cf-value.green { color: var(--green); }
+.cf-value.red { color: var(--red); }
+
+/* SAN pills */
+.san-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+.san-pill {
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px; color: var(--accent);
+}
+
+/* Fingerprint row */
+.cert-fingerprint {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-top: 20px;
+}
+.cf-label.small { font-size: 10px; }
+.fp-value {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted2);
+  word-break: break-all;
+  margin-top: 6px;
+  line-height: 1.8;
+  letter-spacing: 0.04em;
+}
+
+/* Seal */
+.cert-seal {
+  position: absolute;
+  bottom: 28px; right: 36px;
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  border: 2px solid rgba(0,212,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(0,212,255,0.04);
+}
+.seal-icon { font-size: 28px; }
+.seal-text { font-size: 7px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* ── Details accordion ── */
+.details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-block {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.detail-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+}
+.detail-header:hover { background: rgba(255,255,255,0.02); }
+
+.detail-header-left { display: flex; align-items: center; gap: 12px; }
+.detail-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; flex-shrink: 0;
+}
+
+.detail-title { font-family: var(--sans); font-size: 14px; font-weight: 700; color: #fff; }
+.detail-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+.detail-chevron {
+  color: var(--muted); font-size: 12px;
+  transition: transform 0.3s;
+}
+.detail-block.open .detail-chevron { transform: rotate(90deg); }
+
+.detail-body {
+  display: none;
+  border-top: 1px solid var(--border);
+}
+.detail-block.open .detail-body { display: block; }
+
+.detail-table { width: 100%; border-collapse: collapse; }
+.detail-table tr { border-bottom: 1px solid var(--border); }
+.detail-table tr:last-child { border-bottom: none; }
+.detail-table td {
+  padding: 11px 20px;
+  font-size: 12px;
+  vertical-align: top;
+}
+.detail-table td:first-child {
+  color: var(--muted); width: 200px; flex-shrink: 0;
+  padding-right: 10px;
+}
+.detail-table td:last-child { color: var(--text); word-break: break-all; }
+
+.tag {
+  display: inline-block;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px; color: var(--accent);
+  margin: 2px 3px 2px 0;
+}
+.tag.purple { background: rgba(124,58,237,0.1); border-color: rgba(124,58,237,0.25); color: #a78bfa; }
+
+/* ── Loader ── */
+.cert-loader {
+  display: none; flex-direction: column; align-items: center;
+  gap: 16px; padding: 60px 0;
+}
+.cert-loader.show { display: flex; }
+.spinner { width: 44px; height: 44px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loader-text { font-size: 13px; color: var(--muted); animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ── Animate in ── */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(24px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.animate-in { animation: fadeUp 0.5s ease forwards; }
+
+@media (max-width: 600px) {
+  .cert-inner { padding: 20px; }
+  .cert-header { flex-direction: column; }
+  nav { padding: 14px 20px; }
+  .page { padding: 20px 14px 60px; }
+  .gen-grid { grid-template-columns: 1fr; }
+  .gen-actions { flex-wrap: wrap; }
+  .detail-table td:first-child { width: 130px; }
+}
+</style>
+</head>
+<body>
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<nav>
+  <a href="/" class="nav-back">← Back</a>
+  <span class="nav-sep">/</span>
+  <span class="nav-title">X.509 Certificate Viewer</span>
+</nav>
+
+<div class="page">
+
+  <!-- Generator Panel -->
+  <div class="gen-panel animate-in">
+    <h2>Generate Certificate</h2>
+    <p>Fill in the fields below to generate and inspect a signed X.509 TLS certificate.</p>
+    <div class="gen-grid">
+      <div class="field">
+        <label>Domain</label>
+        <input type="text" id="fDomain" value="example.com" placeholder="example.com">
+      </div>
+      <div class="field">
+        <label>Organization</label>
+        <input type="text" id="fOrg" value="Example Corp Ltd." placeholder="Acme Inc.">
+      </div>
+      <div class="field">
+        <label>Certificate Authority</label>
+        <select id="fIssuer">
+          <option value="DigiCert">DigiCert</option>
+          <option value="Let's Encrypt">Let's Encrypt</option>
+          <option value="GlobalSign">GlobalSign</option>
+          <option value="Comodo">Comodo</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Validity (days)</label>
+        <input type="number" id="fValidity" value="365" min="1" max="3650">
+      </div>
+    </div>
+    <div class="gen-actions">
+      <button class="btn-gen" id="genBtn" onclick="generateCert()">
+        🔐 Generate Certificate
+      </button>
+      <button class="btn-dl" id="dlBtn" disabled onclick="downloadPEM()">
+        ↓ Download PEM
+      </button>
+    </div>
+  </div>
+
+  <!-- Loader -->
+  <div class="cert-loader" id="certLoader">
+    <div class="spinner"></div>
+    <div class="loader-text">Generating certificate...</div>
+  </div>
+
+  <!-- Certificate View -->
+  <div id="certView">
+
+    <!-- Visual Certificate Card -->
+    <div class="cert-card animate-in" id="certCard">
+      <div class="cert-topbar"></div>
+      <div class="cert-watermark" id="cwWatermark">CERT</div>
+      <div class="cert-inner">
+
+        <div class="cert-header">
+          <div class="cert-issuer-block">
+            <div class="issuer-logo" id="cwLogo">🔒</div>
+            <div>
+              <div class="issuer-name" id="cwIssuer">DigiCert</div>
+              <div class="issuer-sub">TRUSTED CERTIFICATE AUTHORITY</div>
+            </div>
+          </div>
+          <div class="cert-valid-badge" id="cwBadge">● VALID</div>
+        </div>
+
+        <div class="cert-domain" id="cwDomain">example.com</div>
+        <div class="cert-org" id="cwOrg">Example Corp Ltd. · US</div>
+
+        <div class="cert-divider"></div>
+
+        <div class="cert-grid">
+          <div class="cert-field">
+            <div class="cf-label">Serial Number</div>
+            <div class="cf-value mono" id="cwSerial">—</div>
+          </div>
+          <div class="cert-field">
+            <div class="cf-label">Issued</div>
+            <div class="cf-value" id="cwIssued">—</div>
+          </div>
+          <div class="cert-field">
+            <div class="cf-label">Expires</div>
+            <div class="cf-value" id="cwExpires">—</div>
+          </div>
+          <div class="cert-field">
+            <div class="cf-label">Signature Algorithm</div>
+            <div class="cf-value mono" id="cwSigAlg">—</div>
+          </div>
+          <div class="cert-field">
+            <div class="cf-label">Key Size</div>
+            <div class="cf-value" id="cwKeySize">—</div>
+          </div>
+          <div class="cert-field">
+            <div class="cf-label">Subject Alt Names</div>
+            <div class="san-pills" id="cwSAN"></div>
+          </div>
+        </div>
+
+        <div class="cert-fingerprint">
+          <div class="cf-label small">SHA-256 Fingerprint</div>
+          <div class="fp-value" id="cwFingerprint">—</div>
+        </div>
+
+      </div>
+      <div class="cert-seal">
+        <div class="seal-icon">🛡️</div>
+        <div class="seal-text">Verified</div>
+      </div>
+    </div>
+
+    <!-- Details Accordion -->
+    <div class="details-section" id="detailsSection"></div>
+
+  </div><!-- /certView -->
+
+</div><!-- /page -->
+
+<script>
+let currentCertData = null;
+
+const issuerLogos = {
+  'DigiCert': '🔐',
+  "Let's Encrypt": '🔓',
+  'GlobalSign': '🌐',
+  'Comodo': '🛡️',
+};
+
+async function generateCert() {
+  const domain = document.getElementById('fDomain').value.trim() || 'example.com';
+  const org = document.getElementById('fOrg').value.trim() || 'Example Corp Ltd.';
+  const issuer = document.getElementById('fIssuer').value;
+  const validity = document.getElementById('fValidity').value;
+
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('certView').classList.remove('show');
+  document.getElementById('certLoader').classList.add('show');
+
+  try {
+    const res = await fetch(`/api/certificate?domain=${encodeURIComponent(domain)}&org=${encodeURIComponent(org)}&issuer=${encodeURIComponent(issuer)}&validity=${validity}`);
+    const data = await res.json();
+    currentCertData = data;
+
+    document.getElementById('certLoader').classList.remove('show');
+    renderCert(data);
+    document.getElementById('certView').classList.add('show');
+    document.getElementById('dlBtn').disabled = false;
+
+    // Scroll to view
+    document.getElementById('certView').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } catch(e) {
+    document.getElementById('certLoader').classList.remove('show');
+    alert('Failed to generate certificate: ' + e.message);
+  } finally {
+    document.getElementById('genBtn').disabled = false;
+  }
+}
+
+function renderCert(d) {
+  // Visual card
+  document.getElementById('cwWatermark').textContent = d.issuer.toUpperCase().replace("'", '').replace(' ', '').substring(0, 8);
+  document.getElementById('cwLogo').textContent = issuerLogos[d.issuer] || '🔒';
+  document.getElementById('cwIssuer').textContent = d.issuer;
+  const badge = document.getElementById('cwBadge');
+  badge.textContent = d.valid ? '● VALID' : '● EXPIRED';
+  badge.className = 'cert-valid-badge' + (d.valid ? '' : ' invalid');
+  document.getElementById('cwDomain').textContent = d.domain;
+  document.getElementById('cwOrg').textContent = `${d.org} · ${d.country}`;
+  document.getElementById('cwSerial').textContent = d.serial_number;
+  document.getElementById('cwIssued').textContent = d.issued_at;
+  document.getElementById('cwExpires').textContent = d.expires_at;
+  document.getElementById('cwSigAlg').textContent = d.signature_algorithm;
+  document.getElementById('cwKeySize').textContent = `RSA ${d.key_size} bits`;
+
+  const sanWrap = document.getElementById('cwSAN');
+  sanWrap.innerHTML = (d.san || []).map(s => `<span class="san-pill">${esc(s)}</span>`).join('');
+  document.getElementById('cwFingerprint').textContent = expandFingerprint(d.fingerprint);
+
+  // Accordion sections
+  buildAccordion(d);
+}
+
+function expandFingerprint(fp) {
+  // Already colon separated from backend, just display nicely
+  return fp;
+}
+
+function buildAccordion(d) {
+  const container = document.getElementById('detailsSection');
+  container.innerHTML = '';
+
+  const sections = [
+    {
+      icon: '🏷️',
+      iconBg: 'rgba(0,212,255,0.1)',
+      title: 'Subject Information',
+      sub: 'Entity this certificate belongs to',
+      rows: [
+        ['Common Name (CN)', d.domain],
+        ['Organization (O)', d.org],
+        ['Country (C)', d.country],
+        ['Subject Alt Names', (d.san || []).join(', ')],
+      ]
+    },
+    {
+      icon: '🏛️',
+      iconBg: 'rgba(124,58,237,0.15)',
+      title: 'Issuer & Validity',
+      sub: 'Certificate Authority and time bounds',
+      rows: [
+        ['Issuer (CN)', d.issuer + ' TLS CA'],
+        ['Issuer (O)', d.issuer + ' Inc.'],
+        ['Not Before', d.issued_at],
+        ['Not After', d.expires_at],
+        ['Serial Number', d.serial_number],
+        ['Status', d.valid ? '✓ Valid' : '✗ Expired'],
+      ]
+    },
+    {
+      icon: '🔑',
+      iconBg: 'rgba(255,214,10,0.1)',
+      title: 'Public Key Info',
+      sub: 'Key type, size, and encoded value',
+      rows: [
+        ['Algorithm', 'RSA'],
+        ['Key Size', `${d.key_size} bits`],
+        ['Exponent', '65537 (0x10001)'],
+        ['Public Key (hex)', d.public_key_hex],
+      ]
+    },
+    {
+      icon: '🔏',
+      iconBg: 'rgba(0,255,163,0.08)',
+      title: 'Signature',
+      sub: 'Cryptographic signature details',
+      rows: [
+        ['Algorithm', d.signature_algorithm],
+        ['Hash', 'SHA-256'],
+        ['Padding', 'PKCS#1 v1.5'],
+        ['SHA-256 Fingerprint', d.fingerprint],
+      ]
+    },
+    {
+      icon: '⚙️',
+      iconBg: 'rgba(255,140,66,0.1)',
+      title: 'Extensions',
+      sub: 'X.509v3 certificate extensions',
+      rows: [
+        ['Key Usage', (d.key_usage || []).join(', ')],
+        ['Extended Key Usage', (d.ext_key_usage || []).join(', ')],
+        ['Basic Constraints', 'CA:FALSE'],
+        ['Subject Key Identifier', d.serial_number + ':' + d.serial_number.split('').reverse().join('')],
+      ]
+    },
+    {
+      icon: '🌐',
+      iconBg: 'rgba(124,58,237,0.1)',
+      title: 'Distribution Points',
+      sub: 'OCSP, CRL, and CA issuer URLs',
+      rows: [
+        ['OCSP', d.ocsp_url],
+        ['CA Issuers', d.ca_issuers],
+        ['CRL Distribution', d.crl_url],
+      ]
+    },
+  ];
+
+  sections.forEach((sec, idx) => {
+    const el = document.createElement('div');
+    el.className = 'detail-block';
+    el.style.animationDelay = `${idx * 60}ms`;
+
+    const rows = sec.rows.map(([k, v]) => `
+      <tr>
+        <td>${esc(k)}</td>
+        <td>${formatValue(k, v)}</td>
+      </tr>
+    `).join('');
+
+    el.innerHTML = `
+      <div class="detail-header" onclick="toggleBlock(this.parentElement)">
+        <div class="detail-header-left">
+          <div class="detail-icon" style="background:${sec.iconBg}">${sec.icon}</div>
+          <div>
+            <div class="detail-title">${esc(sec.title)}</div>
+            <div class="detail-sub">${esc(sec.sub)}</div>
+          </div>
+        </div>
+        <span class="detail-chevron">▶</span>
+      </div>
+      <div class="detail-body">
+        <table class="detail-table"><tbody>${rows}</tbody></table>
+      </div>
+    `;
+    container.appendChild(el);
+
+    // Open first two by default
+    if (idx < 2) el.classList.add('open');
+  });
+}
+
+function toggleBlock(el) {
+  el.classList.toggle('open');
+}
+
+function formatValue(key, val) {
+  if (!val) return '<span style="color:var(--muted)">—</span>';
+  const v = String(val);
+
+  if (key === 'Key Usage' || key === 'Extended Key Usage') {
+    return v.split(', ').map(t => `<span class="tag">${esc(t)}</span>`).join('');
+  }
+  if (key === 'Status') {
+    const ok = v.startsWith('✓');
+    return `<span style="color:${ok ? 'var(--green)' : 'var(--red)'}">${esc(v)}</span>`;
+  }
+  if (key.toLowerCase().includes('fingerprint') || key.toLowerCase().includes('public key')) {
+    return `<span style="font-family:var(--mono);font-size:11px;color:var(--muted2);word-break:break-all">${esc(v)}</span>`;
+  }
+  if (key === 'Subject Alt Names') {
+    return v.split(', ').map(s => `<span class="tag">${esc(s)}</span>`).join('');
+  }
+  if (v.startsWith('http')) {
+    return `<a href="${esc(v)}" style="color:var(--accent);text-decoration:none" target="_blank">${esc(v)}</a>`;
+  }
+  return esc(v);
+}
+
+function downloadPEM() {
+  if (!currentCertData) return;
+  const d = currentCertData;
+  const pem = `-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQEL
+BQAwTzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5
+UmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBYMTAeFw0yNDA0
+MDEwMDAwMDBaFw0yNTA0MDEwMDAwMDBaMCUxIzAhBgNVBAMTGiR7ZC5kb21h
+aW59IFRMUyBDZXJ0aWZpY2F0ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC
+AQoCggEBAMFEdugIs6jmf/s/PLACEHOLDER_GENERATED_CERT_DATA
+[Serial: ${d.serial_number}]
+[Issuer: ${d.issuer}]
+[Subject: ${d.domain}]
+[Valid: ${d.issued_at} - ${d.expires_at}]
+-----END CERTIFICATE-----`;
+
+  const blob = new Blob([pem], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${d.domain.replace(/\./g, '_')}.pem`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// Auto-generate on load
+window.addEventListener('DOMContentLoaded', () => {
+  // Check if came from simulation with issuer param
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('issuer')) {
+    document.getElementById('fIssuer').value = params.get('issuer');
+  }
+  if (params.get('domain')) {
+    document.getElementById('fDomain').value = params.get('domain');
+  }
+  generateCert();
+});
+</script>
+</body>
+</html>
